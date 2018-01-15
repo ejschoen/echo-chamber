@@ -46,6 +46,65 @@
    attributes]
   (assoc response "sessionAttributes" attributes))
 
+(def directive-types "Legal directive type names"
+  #{"Dialog.Delegate" "Dialog.ElicitSlot" "Dialog.ConfirmSlot"})
+
+(defn dialog-directive
+  "Returns a map representing a directive to be sent back to Alexa.  Directive must
+   be one of the known directive types (see directive-types), and updated-intent
+   must be an intent, stemming from the intent that would have been sent in the prior
+   request."
+  [directive updated-intent]
+  {:pre [(directive-types directive)
+         (map? updated-intent)]}
+  {"type" directive
+   "updatedIntent" {"name" (get updated-intent "name")
+                    "confirmationStatus" (get updated-intent "confirmationStatus" "NONE")
+                    "slots" (into {}
+                                  (for [[slot spec] (get updated-intent "slots")]
+                                    [slot (merge {"name" (get spec "name")
+                                                  "confirmationStatus" (get spec "confirmationStatus" "NONE")}
+                                                 (when (get spec "value")
+                                                   {"value" (get spec "value")}))]))}})
+
+(defn delegate
+  "Adds a Dialog.Delegate directive to a response."
+  [response updated-intent]
+  {:pre [(not (get response "outputSpeech"))
+         (not (get response "reprompt"))]}
+  (-> response
+      (assoc-in ["response" "shouldEndSession"] false)
+      (update-in ["response" "directives"]
+                 (fn [old]
+                   (conj (or old [])
+                         (dialog-directive "Dialog.Delegate" updated-intent))))))
+
+(defn elicit-slot
+  "Adds a Dialog.ElicitSlot directive to a response.  The response should ultimately
+   contain an outputSpeech entry, but elicit-slot does not enforce this."
+  [response slot-to-elicit updated-intent]
+  {:pre [(not= (get updated-intent "dialogState") "COMPLETED")]}
+  (-> response
+      (assoc-in ["response" "shouldEndSession"] false)
+      (update-in ["response" "directives"]
+                 (fn [old]
+                   (conj (or old [])
+                         (assoc (dialog-directive "Dialog.ElicitSlot" updated-intent)
+                                "slotToElicit" slot-to-elicit))))))
+
+(defn confirm-slot
+  "Adds a Dialog.ConfirmSlot directive to a response. The response should ultimately
+   contain an outputSpeech entry, but confirm-slot does not enforce this."
+  [response slot-to-confirm updated-intent]
+  {:pre [(not= (get updated-intent "dialogState") "COMPLETED")]}
+  (-> response
+      (assoc-in ["response" "shouldEndSession"] false)
+      (update-in ["response" "directives"]
+                 (fn [old]
+                   (conj (or old [])
+                         (assoc (dialog-directive "Dialog.ConfirmSlot" updated-intent)
+                                "slotToConfirm" slot-to-confirm))))))
+
 (defn respond
   "Builds a complete response with the provided arguments.
    The argument is a hash of options. Supported values:

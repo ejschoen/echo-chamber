@@ -65,4 +65,42 @@
                              "sessionAttributes" attributes
                              "response"          {"shouldEndSession" false
                                                   "card"             card
-                                                  "outputSpeech"     speech}}])))
+                                                  "outputSpeech"     speech}}]
+          (is (= expected-response response))))
+  (let [updated-intent {"name" "SearchIntent",
+                        "slots" {"filter" {"name" "filter"}}}]
+    (testing "Dialog.Delegate"
+      (let [response (-> (respond)
+                         (delegate updated-intent))
+            expected-response {"version"  "1.0"
+                               "response"  {"shouldEndSession" false
+                                            "directives"       [{"type"          "Dialog.Delegate"
+                                                                 "updatedIntent" {"name" "SearchIntent"
+                                                                                  "confirmationStatus" "NONE"
+                                                                                  "slots" {"filter" {"name" "filter"
+                                                                                                     "confirmationStatus" "NONE"}}}}]}}]
+        (is (= expected-response response))))
+    (testing "Dialog.ConfirmSlot"
+      (let [response (-> (respond)
+                         (confirm-slot "filter" updated-intent))
+            expected-response {"version"  "1.0"
+                               "response" {"shouldEndSession" false
+                                           "directives"       [{"type"          "Dialog.ConfirmSlot"
+                                                                "slotToConfirm" "filter"
+                                                                "updatedIntent" {"name" "SearchIntent"
+                                                                                 "confirmationStatus" "NONE"
+                                                                                 "slots" {"filter" {"name" "filter"
+                                                                                                    "confirmationStatus" "NONE"}}}}]}}]
+        (is (= expected-response response))))
+    (testing "Dialog.ElicitSlot"
+      (let [response (-> (respond)
+                         (elicit-slot "filter" updated-intent))
+            expected-response {"version"  "1.0"
+                               "response" {"shouldEndSession" false
+                                           "directives"       [{"type"         "Dialog.ElicitSlot"
+                                                                "slotToElicit" "filter"
+                                                                "updatedIntent" {"name" "SearchIntent"
+                                                                                 "confirmationStatus" "NONE"
+                                                                                 "slots" {"filter" {"name" "filter"
+                                                                                                    "confirmationStatus" "NONE"}}}}]}}]
+        (is (= expected-response response))))))
